@@ -52,6 +52,46 @@ fn secure_omission(endpoint: String) -> String {
     }
 }
 
+/// Certain keys are valid, others are errors
+fn validate_s3_keys(keys: Vec<String>) -> Result<bool> {
+    let valid_keys = [
+        "endpoint_url",
+        "region",
+        "access_key_id",
+        "aws_key_id",
+        "secret_access_key",
+        "aws_secret_key",
+        "session_token",
+        "aws_token",
+        "security_token",
+        "master_key",
+        "enable_virtual_host_style",
+        "role_arn",
+        "aws_role_arn",
+        "external_id",
+        "aws_external_id",
+    ];
+
+    for key in keys {
+        let mut is_valid = false;
+        for valid_key in valid_keys {
+            if key == valid_key {
+                is_valid = true;
+                break;
+            }
+        }
+
+        if !is_valid {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                anyhow!("{key} is not correct key."),
+            ));
+        }
+    }
+
+    Ok(true)
+}
+
 /// parse_uri_location will parse given UriLocation into StorageParams and Path.
 pub fn parse_uri_location(l: &UriLocation) -> Result<(StorageParams, String)> {
     // Path endswith `/` means it's a directory, otherwise it's a file.
@@ -140,6 +180,9 @@ pub fn parse_uri_location(l: &UriLocation) -> Result<(StorageParams, String)> {
                 .get("endpoint_url")
                 .cloned()
                 .unwrap_or_else(|| STORAGE_S3_DEFAULT_ENDPOINT.to_string());
+
+            validate_s3_keys(l.connection.keys().cloned().collect::<Vec<String>>())?;
+
             StorageParams::S3(StorageS3Config {
                 endpoint_url: secure_omission(endpoint),
                 region: l.connection.get("region").cloned().unwrap_or_default(),
